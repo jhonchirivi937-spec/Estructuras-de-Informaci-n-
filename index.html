@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gestión de Turnos — Lista Circular</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: #f8fafc; color: #1e293b; padding: 25px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+
+    /* Header */
+    header { display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 20px 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 22px; border: 1px solid #e2e8f0; }
+    h1 { font-size: 1.4rem; color: #0f172a; font-weight: 700; }
+    .status { font-size: 0.85rem; font-weight: 600; padding: 6px 14px; border-radius: 20px; display: flex; align-items: center; gap: 8px; }
+    .status.online { background: #dcfce7; color: #15803d; }
+    .status.offline { background: #fee2e2; color: #b91c1c; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+
+    /* Tarjetas */
+    .card { background: #ffffff; padding: 22px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 22px; border: 1px solid #e2e8f0; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 16px; color: #334155; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Grid y Formularios */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) auto auto; gap: 12px; align-items: end; }
+    label { font-size: 0.82rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.92rem; outline: none; transition: all 0.2s; background: #f8fafc; }
+    input:focus { border-color: #2563eb; background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+
+    /* Botones */
+    button { background: #2563eb; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+    button:hover { background: #1d4ed8; }
+    .btn-priority { background: #8b5cf6; }
+    .btn-priority:hover { background: #7c3aed; }
+    .btn-nav { background: #0284c7; padding: 12px 20px; font-size: 0.95rem; }
+    .btn-nav:hover { background: #0369a1; }
+    .btn-danger { background: #ef4444; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    /* Indicador del Turno Actual */
+    .turno-card { background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 22px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    .turno-card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 8px; }
+    .turno-nombre { font-size: 1.8rem; font-weight: 800; color: #38bdf8; }
+    .turno-id { font-size: 1rem; color: #cbd5e1; margin-top: 4px; }
+    .turno-badge { display: inline-block; background: #334155; padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; margin-top: 10px; color: #a7f3d0; }
+
+    /* Visualizador de Lista Circular */
+    .circular-wrapper { display: flex; align-items: center; gap: 12px; overflow-x: auto; padding: 20px 10px; min-height: 140px; }
+    .node-card { background: #ffffff; border: 2px solid #cbd5e1; border-radius: 12px; min-width: 200px; padding: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.3s; flex-shrink: 0; position: relative; }
+    .node-card.active { border-color: #0284c7; background: #f0f9ff; transform: scale(1.05); box-shadow: 0 8px 15px rgba(2,132,199,0.2); }
+    .node-header { font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .node-card.active .node-header { color: #0284c7; }
+    .node-title { font-weight: 700; font-size: 1rem; color: #0f172a; margin-bottom: 4px; }
+    .node-sub { font-size: 0.82rem; color: #64748b; }
+
+    .arrow-connector { color: #0284c7; font-size: 1.5rem; font-weight: bold; flex-shrink: 0; }
+    .circular-loop-badge { background: #8b5cf6; color: #fff; font-weight: bold; padding: 10px 16px; border-radius: 20px; font-size: 0.85rem; flex-shrink: 0; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(139,92,246,0.2); }
+
+    /* Mensajes y Alertas */
+    .msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 0.88rem; font-weight: 500; display: none; }
+    .msg.success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .msg.error { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    /* Tabla */
+    table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
+    th { background: #f8fafc; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 0.78rem; }
+    tr:hover { background: #f8fafc; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Gestión de Turnos — Lista Circular Enlazada</h1>
+    <div id="status" class="status offline"><span class="dot"></span> <span id="status-text">Conectando...</span></div>
+  </header>
+
+  <div id="alert" class="msg"></div>
+
+  <!-- Panel del Turno Actual -->
+  <div class="turno-card">
+    <h3>📢 TURNO ATENDIÉNDOSE ACTUAMENTE</h3>
+    <div id="turno-nombre" class="turno-nombre">Sin Personas en Espera</div>
+    <div id="turno-id" class="turno-id">---</div>
+    <div id="turno-atenciones" class="turno-badge">Atenciones: 0</div>
+  </div>
+
+  <!-- Controles de Navegación de Turno -->
+  <div class="card" style="display: flex; justify-content: space-between; gap: 15px;">
+    <button onclick="anteriorTurno()" class="btn-nav" style="flex: 1; justify-content: center;">◀ Anterior Turno</button>
+    <button onclick="atenderActual()" class="btn-success" style="flex: 1; justify-content: center;">✔ Atender y Retirar (Reto)</button>
+    <button onclick="siguienteTurno()" class="btn-nav" style="flex: 1; justify-content: center;">Siguiente Turno ▶</button>
+  </div>
+
+  <!-- Registro y Prioridad -->
+  <div class="card">
+    <h2>Registrar Persona en la Lista Circular</h2>
+    <form id="persona-form" class="form-grid">
+      <div>
+        <label for="nombre">Nombre Completo</label>
+        <input type="text" id="nombre" placeholder="Ej: Carlos Gómez" required>
+      </div>
+      <div>
+        <label for="identificacion">Identificación</label>
+        <input type="text" id="identificacion" placeholder="Ej: 101829" required>
+      </div>
+      <button type="submit">Agregar a la Fila</button>
+      <button type="button" onclick="agregarPrioridad()" class="btn-priority">Colar con Prioridad (Reto)</button>
+    </form>
+  </div>
+
+  <!-- Visualización Estructura Circular -->
+  <div class="card">
+    <h2>
+      <span>Estructura de la Lista Circular en Memoria</span>
+      <span style="font-size: 0.85rem; font-weight: 600; color: #2563eb;" id="total-count">Registrados: 0</span>
+    </h2>
+    <div id="circular-visual" class="circular-wrapper">
+      <div class="circular-loop-badge">LISTA VACÍA</div>
+    </div>
+  </div>
+
+  <!-- Búsqueda y Tabla -->
+  <div class="card">
+    <h2>Buscar o Eliminar Persona</h2>
+    <div style="display: flex; gap: 10px; margin-bottom: 18px;">
+      <input type="text" id="search-id" placeholder="Ingresar Identificación a buscar o eliminar...">
+      <button onclick="buscarPersona()">Buscar</button>
+      <button onclick="eliminarPersona()" class="btn-danger">Eliminar</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Identificación</th>
+          <th>Nombre</th>
+          <th>Turnos Atendidos</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="personas-table">
+        <tr><td colspan="4" style="text-align: center; color: #94a3b8;">No hay personas registradas.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const API_URL = "http://127.0.0.1:8000";
+
+  function showAlert(msg, isError = false) {
+    const alertBox = document.getElementById("alert");
+    alertBox.textContent = msg;
+    alertBox.className = `msg ${isError ? "error" : "success"}`;
+    alertBox.style.display = "block";
+    setTimeout(() => { alertBox.style.display = "none"; }, 3500);
+  }
+
+  async function CargarEstado() {
+    try {
+      const res = await fetch(`${API_URL}/estado`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+
+      document.getElementById("status").className = "status online";
+      document.getElementById("status-text").textContent = "Servidor Conectado";
+
+      document.getElementById("total-count").textContent = `Registrados: ${data.total}`;
+
+      // Actualizar Turno Actual
+      if (data.turno_actual) {
+        document.getElementById("turno-nombre").textContent = data.turno_actual.nombre;
+        document.getElementById("turno-id").textContent = `ID: ${data.turno_actual.identificacion}`;
+        document.getElementById("turno-atenciones").textContent = `Atenciones en esta sesión: ${data.turno_actual.turnos_atendidos}`;
+      } else {
+        document.getElementById("turno-nombre").textContent = "Sin Personas en Espera";
+        document.getElementById("turno-id").textContent = "---";
+        document.getElementById("turno-atenciones").textContent = "Atenciones: 0";
+      }
+
+      renderCircularGraph(data.personas);
+      renderTable(data.personas);
+    } catch (err) {
+      document.getElementById("status").className = "status offline";
+      document.getElementById("status-text").textContent = "Servidor Desconectado";
+    }
+  }
+
+  function renderCircularGraph(personas) {
+    const visual = document.getElementById("circular-visual");
+    if (!personas || personas.length === 0) {
+      visual.innerHTML = '<div class="circular-loop-badge">LISTA VACÍA (Puntero Cabeza en NULL)</div>';
+      return;
+    }
+
+    let html = '';
+    personas.forEach((p, idx) => {
+      html += `
+        <div class="node-card ${p.es_actual ? 'active' : ''}">
+          <div class="node-header">
+            <span>NODO #${idx + 1} ${p.es_cabeza ? ' (CABEZA)' : ''}</span>
+            <span>${p.es_actual ? '🔔 TURNO' : ''}</span>
+          </div>
+          <div class="node-title">${p.nombre}</div>
+          <div class="node-sub">ID: ${p.identificacion}</div>
+          <div class="node-sub" style="margin-top: 4px; color: #8b5cf6;">Atendido: ${p.turnos_atendidos} veces</div>
+        </div>
+        <span class="arrow-connector">➔</span>
+      `;
+    });
+
+    // Enlace que demuestra el retorno del último nodo al primer nodo
+    html += `<div class="circular-loop-badge">🔄 RETORNO A CABEZA (${personas[0].nombre})</div>`;
+    visual.innerHTML = html;
+  }
+
+  function renderTable(personas) {
+    const tbody = document.getElementById("personas-table");
+    if (!personas || personas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">No hay personas registradas.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = personas.map(p => `
+      <tr style="${p.es_actual ? 'background: #f0f9ff; font-weight: bold;' : ''}">
+        <td>${p.identificacion}</td>
+        <td>${p.nombre}</td>
+        <td>${p.turnos_atendidos}</td>
+        <td>${p.es_actual ? '<span style="color: #0284c7;">EN ATENCIÓN</span>' : 'En Espera'}</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById("persona-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nombre = document.getElementById("nombre").value.trim();
+    const identificacion = document.getElementById("identificacion").value.trim();
+
+    try {
+      const res = await fetch(`${API_URL}/agregar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, identificacion })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+
+      showAlert(data.mensaje);
+      document.getElementById("persona-form").reset();
+      CargarEstado();
+    } catch (err) {
+      showAlert(err.message, true);
+    }
+  });
+
+  async function agregarPrioridad() {
+    const nombre = document.getElementById("nombre").value.trim();
+    const identificacion = document.getElementById("identificacion").value.trim();
+
+    if (!nombre || !identificacion) {
+      showAlert("Diligencie el nombre e identificación para agregar con prioridad", true);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/agregar-prioridad`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, identificacion })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+
+      showAlert(data.mensaje);
+      document.getElementById("persona-form").reset();
+      CargarEstado();
+    } catch (err) {
+      showAlert(err.message, true);
+    }
+  }
+
+  async function siguienteTurno() {
+    try {
+      const res = await fetch(`${API_URL}/siguiente`);
+      if (!res.ok) throw new Error("La lista está vacía");
+      CargarEstado();
+    } catch (err) {
+      showAlert(err.message, true);
+    }
+  }
+
+  async function anteriorTurno() {
+    try {
+      const res = await fetch(`${API_URL}/anterior`);
+      if (!res.ok) throw new Error("La lista está vacía");
+      CargarEstado();
+    } catch (err) {
+      showAlert(err.message, true);
+    }
+  }
+
+  async function atenderActual() {
+    try {
+      const res = await fetch(`${API_URL}/atender-actual`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+
+      showAlert(`${data.mensaje}: ${data.persona.nombre}`);
+      CargarEstado();
+    } catch (err) {
+      showAlert(err.message, true);
+    }
+  }
+
+  async function buscarPersona() {
+    const id = document.getElementById("search-id").value.trim();
+    if (!id) return showAlert("Ingrese una identificación a buscar", true);
+
+    try {
+      const res = await fetch(`${API_URL}/buscar/${id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+
+      alert(`🔍 Persona Encontrada:\nNombre: ${data.nombre}\nIdentificación: ${data.identificacion}\nTurnos Atendidos: ${data.turnos_atendidos}`);
+    } catch (err) {
+      showAlert(err.message, true);
+    }
+  }
+
+  async function eliminarPersona() {
+    const id = document.getElementById("search-id").value.trim();
+    if (!id) return showAlert("Ingrese una identificación a eliminar", true);
+
+    try {
+      const res = await fetch(`${API_URL}/eliminar/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+
+      showAlert(data.mensaje);
+      document.getElementById("search-id").value = "";
+      CargarEstado();
+    } catch (err) {
+      showAlert(err.message, true);
+    }
+  }
+
+  CargarEstado();
+</script>
+</body>
+</html>
